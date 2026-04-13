@@ -1,7 +1,13 @@
 import os
 import json
-import psycopg2
-import psycopg2.extras
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:
+    from psycopg2cffi import compat
+    compat.register()
+    import psycopg2
+    import psycopg2.extras
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
