@@ -91,7 +91,7 @@ def health():
 @app.route("/api/scan", methods=["POST"])
 def scan():
     import time
-    window = 300
+    window = 86400  # 24 hours for testing
     now = time.time()
     since = now - window
 
