@@ -6,6 +6,7 @@ import db
 import alert_engine
 
 app = Flask(__name__)
+db.init_db()
 
 # Optional API key auth — set INGEST_API_KEY env var to require it
 API_KEY = os.environ.get("INGEST_API_KEY", "")
