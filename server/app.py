@@ -86,6 +86,47 @@ def health():
     return jsonify({"status": "ok"})
 
 
+# ── Manual alert scan (re-runs detection against all stored events) ───────────
+
+@app.route("/api/scan", methods=["POST"])
+def scan():
+    import time
+    window = 300
+    now = time.time()
+    since = now - window
+
+    machines = db.get_conn().execute(
+        "SELECT DISTINCT machine FROM events"
+    ).fetchall()
+
+    total_alerts = 0
+    for row in machines:
+        machine = row["machine"]
+        count = db.count_recent_events(machine, 4625, since)
+        if count >= 5:
+            from mitre_mapper import get_technique
+            technique = get_technique(4625)
+            alert = {
+                "machine":      machine,
+                "event_id":     4625,
+                "technique_id": technique["technique_id"],
+                "technique":    technique["technique"],
+                "tactic":       technique["tactic"],
+                "severity":     technique["severity"],
+                "description":  f"Brute force detected: {count} failed logins in 5 minutes",
+                "details":      {"failed_count": count, "window_seconds": window},
+                "time":         db.get_conn().execute(
+                    "SELECT time FROM events WHERE machine=? AND event_id=4625 ORDER BY timestamp DESC LIMIT 1",
+                    (machine,)
+                ).fetchone()["time"],
+                "timestamp":    now,
+            }
+            db.insert_alert(alert)
+            total_alerts += 1
+
+    return jsonify({"status": "ok", "alerts_created": total_alerts})
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
