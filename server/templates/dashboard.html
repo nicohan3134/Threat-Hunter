@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threat Hunter — SOC Dashboard</title>
+<style>
+  :root {
+    --bg:       #0a0a14;
+    --surface:  #111122;
+    --border:   #1e1e3a;
+    --cyan:     #00d4ff;
+    --green:    #00ff88;
+    --yellow:   #ffcc00;
+    --orange:   #ff8800;
+    --red:      #ff3355;
+    --text:     #c8c8e0;
+    --muted:    #555577;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Consolas', monospace; font-size: 13px; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 18px; color: var(--cyan); letter-spacing: 2px; }
+  #live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--green);
+  }
+  #live-badge span.dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  #last-refresh { font-size: 11px; color: var(--muted); }
+
+  /* ── Layout ── */
+  .container { padding: 20px 24px; }
+
+  /* ── Stat cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px; text-align: center;
+  }
+  .stat-card .value { font-size: 32px; font-weight: bold; }
+  .stat-card .label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-card.critical .value { color: var(--red); }
+  .stat-card.high     .value { color: var(--orange); }
+  .stat-card.warn     .value { color: var(--yellow); }
+  .stat-card.info     .value { color: var(--cyan); }
+  .stat-card.ok       .value { color: var(--green); }
+
+  /* ── Panels ── */
+  .panels { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  }
+  .panel-header span { color: var(--cyan); }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    padding: 8px 12px; text-align: left; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--surface);
+  }
+  td { padding: 8px 12px; border-bottom: 1px solid #0e0e20; vertical-align: top; }
+  tr:hover td { background: #13132a; }
+
+  /* ── Severity badges ── */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .badge.critical { background: #3a0015; color: var(--red);    border: 1px solid var(--red); }
+  .badge.high     { background: #2a1800; color: var(--orange); border: 1px solid var(--orange); }
+  .badge.medium   { background: #2a2200; color: var(--yellow); border: 1px solid var(--yellow); }
+  .badge.low      { background: #001a10; color: var(--green);  border: 1px solid var(--green); }
+
+  /* ── Ack button ── */
+  .ack-btn {
+    background: none; border: 1px solid var(--muted); color: var(--muted);
+    border-radius: 3px; padding: 2px 8px; cursor: pointer; font-size: 10px;
+    font-family: 'Consolas', monospace;
+  }
+  .ack-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* ── Tactics sidebar ── */
+  .tactic-item { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .tactic-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .tactic-name { color: var(--text); }
+  .tactic-count { color: var(--cyan); font-weight: bold; }
+  .tactic-bar-bg { height: 4px; background: var(--border); border-radius: 2px; }
+  .tactic-bar { height: 4px; background: var(--cyan); border-radius: 2px; transition: width 0.4s; }
+
+  /* ── Empty state ── */
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+
+  /* ── Filter bar ── */
+  .filter-bar { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .filter-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 3px; padding: 4px 12px; cursor: pointer; font-size: 11px;
+    font-family: 'Consolas', monospace;
+  }
+  .filter-btn.active, .filter-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* ── Technique tags ── */
+  .technique { color: var(--cyan); font-size: 11px; }
+  .tactic-tag { color: var(--muted); font-size: 11px; }
+  .machine-tag { color: var(--yellow); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#x25A0; THREAT HUNTER</h1>
+  <div id="live-badge"><span class="dot"></span> LIVE</div>
+  <div id="last-refresh">Refreshing...</div>
+</header>
+
+<div class="container">
+
+  <!-- Stat cards -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card critical"><div class="value" id="s-critical">–</div><div class="label">Critical</div></div>
+    <div class="stat-card high">   <div class="value" id="s-high">–</div>    <div class="label">High</div></div>
+    <div class="stat-card warn">   <div class="value" id="s-unacked">–</div> <div class="label">Unacknowledged</div></div>
+    <div class="stat-card info">   <div class="value" id="s-alerts">–</div>  <div class="label">Total Alerts</div></div>
+    <div class="stat-card ok">     <div class="value" id="s-events">–</div>  <div class="label">Events Ingested</div></div>
+    <div class="stat-card ok">     <div class="value" id="s-machines">–</div><div class="label">Machines</div></div>
+  </div>
+
+  <div class="panels">
+
+    <!-- Alerts panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Active Alerts</span>
+        <div id="alert-count" style="color:var(--muted)"></div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+        <button class="filter-btn" onclick="setFilter('critical', this)">Critical</button>
+        <button class="filter-btn" onclick="setFilter('high', this)">High</button>
+        <button class="filter-btn" onclick="setFilter('medium', this)">Medium</button>
+        <button class="filter-btn" onclick="setFilter('unacked', this)">Unacknowledged</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Severity</th>
+              <th>Technique</th>
+              <th>Machine</th>
+              <th>Description</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="alerts-tbody">
+            <tr><td colspan="6" class="empty">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tactics sidebar -->
+    <div class="panel">
+      <div class="panel-header"><span>MITRE ATT&CK Tactics</span></div>
+      <div id="tactics-list"><div class="empty">Loading...</div></div>
+
+      <div class="panel-header" style="margin-top:8px"><span>Top Techniques</span></div>
+      <div id="techniques-list"><div class="empty">Loading...</div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let allAlerts = [];
+let currentFilter = 'all';
+
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAlerts();
+}
+
+function renderAlerts() {
+  let filtered = allAlerts;
+  if (currentFilter === 'unacked') {
+    filtered = allAlerts.filter(a => !a.acknowledged);
+  } else if (currentFilter !== 'all') {
+    filtered = allAlerts.filter(a => a.severity === currentFilter);
+  }
+
+  const tbody = document.getElementById('alerts-tbody');
+  document.getElementById('alert-count').textContent = filtered.length + ' alerts';
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No alerts matching filter</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(a => `
+    <tr id="alert-${a.id}" style="${a.acknowledged ? 'opacity:0.4' : ''}">
+      <td style="white-space:nowrap;color:var(--muted)">${a.time}</td>
+      <td><span class="badge ${a.severity}">${a.severity}</span></td>
+      <td>
+        <div class="technique">${a.technique_id} — ${a.technique}</div>
+        <div class="tactic-tag">${a.tactic}</div>
+      </td>
+      <td class="machine-tag">${a.machine}</td>
+      <td>${a.description}</td>
+      <td>${a.acknowledged ? '' : `<button class="ack-btn" onclick="ack(${a.id})">ACK</button>`}</td>
+    </tr>
+  `).join('');
+}
+
+async function ack(id) {
+  await fetch('/api/alerts/' + id + '/acknowledge', { method: 'POST' });
+  const row = document.getElementById('alert-' + id);
+  if (row) row.style.opacity = '0.4';
+  // Update local state
+  const alert = allAlerts.find(a => a.id === id);
+  if (alert) alert.acknowledged = true;
+  renderAlerts();
+}
+
+function renderTactics(tactics) {
+  if (!tactics.length) {
+    document.getElementById('tactics-list').innerHTML = '<div class="empty">No data yet</div>';
+    return;
+  }
+  const max = tactics[0].cnt;
+  document.getElementById('tactics-list').innerHTML = tactics.map(t => `
+    <div class="tactic-item">
+      <div class="tactic-row">
+        <span class="tactic-name">${t.tactic}</span>
+        <span class="tactic-count">${t.cnt}</span>
+      </div>
+      <div class="tactic-bar-bg">
+        <div class="tactic-bar" style="width:${Math.round(t.cnt/max*100)}%"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTechniques(techniques) {
+  if (!techniques.length) {
+    document.getElementById('techniques-list').innerHTML = '<div class="empty">No data yet</div>';
+    return;
+  }
+  document.getElementById('techniques-list').innerHTML = techniques.map(t => `
+    <div class="tactic-item">
+      <div class="tactic-row">
+        <span class="technique">${t.technique_id} — ${t.technique}</span>
+        <span class="tactic-count">${t.cnt}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function refresh() {
+  try {
+    const [alertsRes, statsRes] = await Promise.all([
+      fetch('/api/alerts?limit=200'),
+      fetch('/api/stats')
+    ]);
+    allAlerts = await alertsRes.json();
+    const stats  = await statsRes.json();
+
+    document.getElementById('s-critical').textContent = stats.critical;
+    document.getElementById('s-high').textContent     = stats.high;
+    document.getElementById('s-unacked').textContent  = stats.unacknowledged;
+    document.getElementById('s-alerts').textContent   = stats.total_alerts;
+    document.getElementById('s-events').textContent   = stats.total_events;
+    document.getElementById('s-machines').textContent = stats.machines;
+
+    renderAlerts();
+    renderTactics(stats.tactics || []);
+    renderTechniques(stats.top_techniques || []);
+
+    document.getElementById('last-refresh').textContent =
+      'Last refresh: ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    document.getElementById('last-refresh').textContent = 'Refresh failed — ' + e.message;
+  }
+}
+
+// Initial load + auto-refresh every 30s
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
