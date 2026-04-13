@@ -94,6 +94,15 @@ def get_alerts(limit=200, unacked_only=False):
     return [dict(r) for r in rows]
 
 
+def count_recent_events(machine, event_id, since_timestamp):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE machine=? AND event_id=? AND timestamp>=?",
+            (machine, event_id, since_timestamp)
+        ).fetchone()
+    return row[0]
+
+
 def acknowledge_alert(alert_id):
     with get_conn() as conn:
         conn.execute("UPDATE alerts SET acknowledged=1 WHERE id=?", (alert_id,))

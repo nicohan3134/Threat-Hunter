@@ -3,11 +3,8 @@ Alert engine — runs detection rules against incoming events.
 Each rule returns an alert dict or None.
 """
 import time
-import collections
+import db
 from mitre_mapper import get_technique
-
-# Track recent events per machine for correlation rules
-_failed_logins = collections.defaultdict(list)   # machine -> [timestamps]
 
 
 def process_events(machine, events):
@@ -24,7 +21,7 @@ def process_events(machine, events):
         if alert:
             alerts.append(alert)
 
-    # Correlation alerts (need full batch context)
+    # Correlation alerts (checks database for history)
     alerts += _brute_force_check(machine, events)
 
     return alerts
@@ -59,24 +56,17 @@ def _single_event_alert(machine, event, technique):
 
 
 def _brute_force_check(machine, events):
-    """Alert if 5+ failed logins within a 5-minute window."""
+    """Alert if 5+ failed logins within a 5-minute window, using the database."""
     alerts = []
     window = 300  # seconds
-
-    for event in events:
-        if event["event_id"] == 4625:
-            _failed_logins[machine].append(event["timestamp"])
-
-    # Prune old entries
     now = time.time()
-    _failed_logins[machine] = [
-        t for t in _failed_logins[machine] if now - t < window
-    ]
+    since = now - window
 
-    count = len(_failed_logins[machine])
+    # Count failed logins for this machine in the last 5 minutes from the DB
+    count = db.count_recent_events(machine, 4625, since)
+
     if count >= 5:
         technique = get_technique(4625)
-        # Build a synthetic event for the alert
         synthetic = {
             "event_id":  4625,
             "time":      events[-1]["time"] if events else "",
@@ -88,8 +78,6 @@ def _brute_force_check(machine, events):
             description=f"Brute force detected: {count} failed logins in 5 minutes",
             details={"failed_count": count, "window_seconds": window}
         ))
-        # Reset so we don't spam alerts
-        _failed_logins[machine] = []
 
     return alerts
 
