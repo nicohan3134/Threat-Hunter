@@ -119,7 +119,7 @@ def scan():
             db.insert_alert(alert)
             total_alerts += 1
 
-    return jsonify({"status": "ok", "alerts_created": total_alerts})
+    return jsonify({"status": "ok", "alerts_created": total_alerts, "machines_checked": machines, "debug_counts": {m: db.count_recent_events(m, 4625, since) for m in machines}})
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
