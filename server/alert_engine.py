@@ -65,7 +65,7 @@ def _brute_force_check(machine, events):
     # Count failed logins for this machine in the last 5 minutes from the DB
     count = db.count_recent_events(machine, 4625, since)
 
-    if count >= 5:
+    if count >= 3:
         technique = get_technique(4625)
         synthetic = {
             "event_id":  4625,

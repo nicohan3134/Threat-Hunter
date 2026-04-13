@@ -101,7 +101,7 @@ def scan():
 
     for machine in machines:
         count = db.count_recent_events(machine, 4625, since)
-        if count >= 5:
+        if count >= 3:
             technique = get_technique(4625)
             last_time = db.get_last_event_time(machine, 4625)
             alert = {
