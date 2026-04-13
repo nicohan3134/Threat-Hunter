@@ -91,21 +91,19 @@ def health():
 @app.route("/api/scan", methods=["POST"])
 def scan():
     import time
+    from mitre_mapper import get_technique
     window = 86400  # 24 hours for testing
     now = time.time()
     since = now - window
 
-    machines = db.get_conn().execute(
-        "SELECT DISTINCT machine FROM events"
-    ).fetchall()
-
+    machines = db.get_distinct_machines()
     total_alerts = 0
-    for row in machines:
-        machine = row["machine"]
+
+    for machine in machines:
         count = db.count_recent_events(machine, 4625, since)
         if count >= 5:
-            from mitre_mapper import get_technique
             technique = get_technique(4625)
+            last_time = db.get_last_event_time(machine, 4625)
             alert = {
                 "machine":      machine,
                 "event_id":     4625,
@@ -113,12 +111,9 @@ def scan():
                 "technique":    technique["technique"],
                 "tactic":       technique["tactic"],
                 "severity":     technique["severity"],
-                "description":  f"Brute force detected: {count} failed logins in 5 minutes",
+                "description":  f"Brute force detected: {count} failed logins in 24 hours",
                 "details":      {"failed_count": count, "window_seconds": window},
-                "time":         db.get_conn().execute(
-                    "SELECT time FROM events WHERE machine=? AND event_id=4625 ORDER BY timestamp DESC LIMIT 1",
-                    (machine,)
-                ).fetchone()["time"],
+                "time":         last_time,
                 "timestamp":    now,
             }
             db.insert_alert(alert)

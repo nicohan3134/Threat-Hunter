@@ -111,6 +111,24 @@ def acknowledge_alert(alert_id):
         conn.commit()
 
 
+def get_distinct_machines():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT machine FROM events")
+            return [row[0] for row in cur.fetchall()]
+
+
+def get_last_event_time(machine, event_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT time FROM events WHERE machine=%s AND event_id=%s ORDER BY timestamp DESC LIMIT 1",
+                (machine, event_id)
+            )
+            row = cur.fetchone()
+            return row[0] if row else ""
+
+
 def count_recent_events(machine, event_id, since_timestamp):
     with get_conn() as conn:
         with conn.cursor() as cur:
