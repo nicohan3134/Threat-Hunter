@@ -266,6 +266,58 @@
     padding: 48px 20px; text-align: center; color: var(--muted);
   }
   .empty-state p { font-size: 13px; margin-top: 4px; }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── KQL editor ── */
+  .kql-bar {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .kql-input {
+    flex: 1; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); color: var(--text);
+    font-family: 'SF Mono', 'Consolas', monospace; font-size: 13px;
+    resize: vertical; min-height: 38px;
+    outline: none;
+  }
+  .kql-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px #dbeafe; }
+
+  .kql-run-btn {
+    padding: 8px 18px; border-radius: 6px;
+    background: var(--blue); color: #fff;
+    border: none; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .kql-run-btn:hover { background: #1d4ed8; }
+
+  .kql-hints {
+    padding: 10px 20px 0;
+    font-size: 11px; color: var(--muted);
+  }
+  .kql-hints code {
+    background: var(--border); padding: 1px 5px; border-radius: 3px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+  }
+
+  .kql-error {
+    margin: 12px 20px;
+    padding: 10px 14px; border-radius: 6px;
+    background: var(--red-light); color: var(--red);
+    border: 1px solid #fecaca; font-size: 13px;
+    display: none;
+  }
+
+  .kql-meta {
+    padding: 8px 20px;
+    font-size: 12px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
 </style>
 </head>
 <body>
@@ -279,23 +331,23 @@
     </div>
     <nav class="sidebar-nav">
       <div class="nav-label">Monitor</div>
-      <div class="nav-item active">
+      <div class="nav-item active" onclick="showPage('dashboard', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
         Dashboard
       </div>
-      <div class="nav-item">
+      <div class="nav-item" onclick="showPage('alerts', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
         </svg>
         Alerts
       </div>
-      <div class="nav-item">
+      <div class="nav-item" onclick="showPage('logs', this)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
-        Events
+        Log Search
       </div>
     </nav>
     <div class="sidebar-footer" id="last-refresh">Refreshing...</div>
@@ -304,13 +356,86 @@
   <!-- Main -->
   <div class="main">
     <div class="topbar">
-      <h1>Security Overview</h1>
+      <h1 id="page-title">Security Overview</h1>
       <div class="topbar-right">
         <div class="live-badge"><span class="dot"></span> Live</div>
       </div>
     </div>
 
     <div class="content">
+
+    <!-- ── LOGS PAGE ─────────────────────────────────────────────────── -->
+    <div id="page-logs" class="page">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">KQL Log Search</span>
+          <span class="card-count">Powered by Kusto Query Language</span>
+        </div>
+
+        <div class="kql-hints">
+          Try: <code>| where EventID == 4625</code> &nbsp;|&nbsp;
+          <code>| search "Administrator"</code> &nbsp;|&nbsp;
+          <code>| where EventID == 4624 and Machine contains "DESKTOP"</code> &nbsp;|&nbsp;
+          <code>| sort by TimeGenerated desc | take 50</code>
+        </div>
+
+        <div class="kql-bar">
+          <textarea class="kql-input" id="kql-input" rows="2" placeholder="| where EventID == 4625&#10;| sort by TimeGenerated desc&#10;| take 100"></textarea>
+          <button class="kql-run-btn" onclick="runKQL()">Run Query</button>
+        </div>
+
+        <div class="kql-error" id="kql-error"></div>
+        <div class="kql-meta" id="kql-meta" style="display:none"></div>
+
+        <div class="table-wrap" style="max-height:600px">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event ID</th>
+                <th>Log</th>
+                <th>Machine</th>
+                <th>Source</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="6"><div class="empty-state"><p>Run a query to see results</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ALERTS PAGE ────────────────────────────────────────────────── -->
+    <div id="page-alerts" class="page">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">All Alerts</span>
+          <span class="card-count" id="alert-count-full"></span>
+        </div>
+        <div class="table-wrap" style="max-height:700px">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Severity</th>
+                <th>Technique</th>
+                <th>Machine</th>
+                <th>Description</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="alerts-tbody-full">
+              <tr><td colspan="6"><div class="empty-state"><p>No alerts yet</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD PAGE ─────────────────────────────────────────────── -->
+    <div id="page-dashboard" class="page active">
 
       <!-- Stats -->
       <div class="stats-grid">
@@ -406,12 +531,87 @@
         </div>
       </div>
     </div>
+
+    </div> <!-- end page-dashboard -->
+    </div> <!-- end content -->
   </div>
 </div>
 
 <script>
 let allAlerts = [];
 let currentFilter = 'all';
+
+// ── Page navigation ──────────────────────────────────────────────────────────
+const pageTitles = { dashboard: 'Security Overview', alerts: 'Alerts', logs: 'Log Search' };
+
+function showPage(name, navItem) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  navItem.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[name] || name;
+}
+
+// ── KQL query ────────────────────────────────────────────────────────────────
+async function runKQL() {
+  const input   = document.getElementById('kql-input').value.trim();
+  const errBox  = document.getElementById('kql-error');
+  const metaBox = document.getElementById('kql-meta');
+  const tbody   = document.getElementById('logs-tbody');
+
+  errBox.style.display  = 'none';
+  metaBox.style.display = 'none';
+  tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>Running query...</p></div></td></tr>';
+
+  try {
+    const res  = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: input })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errBox.textContent  = 'Error: ' + (data.error || 'Unknown error');
+      errBox.style.display = 'block';
+      tbody.innerHTML = '';
+      return;
+    }
+
+    const results = data.results || [];
+    metaBox.textContent  = `${results.length} result${results.length !== 1 ? 's' : ''} returned`;
+    metaBox.style.display = 'block';
+
+    if (results.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No results matched your query</p></div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = results.map(e => {
+      const strings = (() => { try { return JSON.parse(e.strings || '[]'); } catch { return []; } })();
+      const detail  = strings.slice(0, 3).filter(Boolean).join(' · ') || '—';
+      return `
+        <tr>
+          <td style="white-space:nowrap;color:var(--muted);font-size:12px">${e.time}</td>
+          <td><span class="technique-id">${e.event_id}</span></td>
+          <td style="color:var(--muted)">${e.log}</td>
+          <td><span class="machine-name">${e.machine}</span></td>
+          <td style="color:var(--muted);font-size:12px">${e.source}</td>
+          <td style="color:var(--muted);font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${detail}">${detail}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch(e) {
+    errBox.textContent  = 'Request failed: ' + e.message;
+    errBox.style.display = 'block';
+  }
+}
+
+// Allow Ctrl+Enter to run query
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runKQL();
+});
 
 function setFilter(filter, btn) {
   currentFilter = filter;
@@ -438,6 +638,29 @@ function renderAlerts() {
 
   tbody.innerHTML = filtered.map(a => `
     <tr id="alert-${a.id}" class="${a.acknowledged ? 'acked' : ''}">
+      <td style="white-space:nowrap;color:var(--muted);font-size:12px">${a.time}</td>
+      <td><span class="badge ${a.severity}">${a.severity}</span></td>
+      <td>
+        <div class="technique-id">${a.technique_id}</div>
+        <div class="technique-name">${a.technique}</div>
+        <div class="tactic-name">${a.tactic}</div>
+      </td>
+      <td><span class="machine-name">${a.machine}</span></td>
+      <td style="color:var(--muted)">${a.description}</td>
+      <td>${a.acknowledged ? '' : `<button class="ack-btn" onclick="ack(${a.id})">Acknowledge</button>`}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAlertsFullPage() {
+  const tbody = document.getElementById('alerts-tbody-full');
+  document.getElementById('alert-count-full').textContent = allAlerts.length + ' alerts';
+  if (!allAlerts.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No alerts yet</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allAlerts.map(a => `
+    <tr id="alertf-${a.id}" class="${a.acknowledged ? 'acked' : ''}">
       <td style="white-space:nowrap;color:var(--muted);font-size:12px">${a.time}</td>
       <td><span class="badge ${a.severity}">${a.severity}</span></td>
       <td>
@@ -509,6 +732,7 @@ async function refresh() {
     document.getElementById('s-machines').textContent = stats.machines;
 
     renderAlerts();
+    renderAlertsFullPage();
     renderTactics(stats.tactics || []);
     renderTechniques(stats.top_techniques || []);
 

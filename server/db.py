@@ -139,6 +139,14 @@ def count_recent_events(machine, event_id, since_timestamp):
             return cur.fetchone()[0]
 
 
+def run_query(where_sql, order_by, limit, params):
+    sql = f"SELECT * FROM events WHERE {where_sql} ORDER BY {order_by} LIMIT {limit}"
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, params)
+            return [dict(r) for r in cur.fetchall()]
+
+
 def get_stats():
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

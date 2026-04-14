@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, render_template, abort
 
 import db
 import alert_engine
+import kql as kql_parser
 
 app = Flask(__name__)
 db.init_db()
@@ -77,6 +78,25 @@ def get_stats():
 def acknowledge(alert_id):
     db.acknowledge_alert(alert_id)
     return jsonify({"status": "ok"})
+
+
+# ── KQL query endpoint ───────────────────────────────────────────────────────
+
+@app.route("/api/query", methods=["POST"])
+def query():
+    data = request.get_json(force=True)
+    raw_query = data.get("query", "").strip()
+
+    if not raw_query:
+        return jsonify({"error": "No query provided"}), 400
+
+    try:
+        where_sql, order_by, limit, params = kql_parser.parse(raw_query)
+    except kql_parser.KQLError as e:
+        return jsonify({"error": str(e)}), 400
+
+    results = db.run_query(where_sql, order_by, limit, params)
+    return jsonify({"results": results, "count": len(results)})
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
