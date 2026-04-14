@@ -561,6 +561,13 @@ async function runKQL() {
 
   errBox.style.display  = 'none';
   metaBox.style.display = 'none';
+
+  if (!input) {
+    errBox.textContent   = 'Type a query first, then click Run Query.';
+    errBox.style.display = 'block';
+    return;
+  }
+
   tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>Running query...</p></div></td></tr>';
 
   try {
