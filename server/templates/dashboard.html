@@ -300,6 +300,66 @@
   }
   .empty-state p { font-size: 13px; margin-top: 4px; }
 
+  /* ── Hero header ── */
+  .hero-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1a1d2e 50%, #0f2027 100%);
+    padding: 24px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: relative; overflow: hidden;
+  }
+
+  .hero-header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 60px,
+      rgba(255,255,255,0.015) 60px,
+      rgba(255,255,255,0.015) 61px
+    );
+    pointer-events: none;
+  }
+
+  .hero-left { display: flex; align-items: center; gap: 16px; }
+
+  .hero-graphic { flex-shrink: 0; }
+
+  .hero-title {
+    font-size: 22px; font-weight: 800;
+    color: #ffffff; letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .hero-subtitle {
+    font-size: 11px; font-weight: 500;
+    color: rgba(255,255,255,0.45); letter-spacing: 2px;
+    text-transform: uppercase; margin-top: 3px;
+  }
+
+  .hero-right {
+    display: flex; align-items: center; gap: 20px;
+  }
+
+  .hero-stat { text-align: center; }
+  .hero-stat-value { font-size: 22px; font-weight: 700; color: #ffffff; }
+  .hero-stat-label { font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+  .hero-divider { width: 1px; height: 32px; background: rgba(255,255,255,0.1); }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; color: #4ade80;
+    background: rgba(74,222,128,0.1); padding: 5px 12px;
+    border-radius: 20px; border: 1px solid rgba(74,222,128,0.2);
+  }
+  .live-badge .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #4ade80; animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
   /* ── Pages ── */
   .page { display: none; }
   .page.active { display: block; }
@@ -412,10 +472,50 @@
 
   <!-- Main -->
   <div class="main">
+    <!-- Hero header -->
+    <div class="hero-header">
+      <div class="hero-left">
+        <div class="hero-graphic">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <polygon points="24,3 43,13.5 43,34.5 24,45 5,34.5 5,13.5"
+              fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+            <polygon points="24,8 38,16 38,32 24,40 10,32 10,16"
+              fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+            <line x1="24" y1="10" x2="24" y2="38" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+            <line x1="10" y1="24" x2="38" y2="24" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+            <circle cx="24" cy="24" r="3" fill="white"/>
+            <circle cx="24" cy="24" r="6" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="hero-text">
+          <div class="hero-title">THREAT HUNTER</div>
+          <div class="hero-subtitle">Security Operations Platform</div>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="h-events">–</div>
+          <div class="hero-stat-label">Events</div>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="h-alerts">–</div>
+          <div class="hero-stat-label">Alerts</div>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="hero-stat">
+          <div class="hero-stat-value" id="h-machines">–</div>
+          <div class="hero-stat-label">Machines</div>
+        </div>
+        <div class="hero-divider"></div>
+        <div class="live-badge"><span class="dot"></span> Live</div>
+      </div>
+    </div>
+
     <div class="topbar">
       <h1 id="page-title">Security Overview</h1>
       <div class="topbar-right">
-        <div class="live-badge"><span class="dot"></span> Live</div>
+        <div id="last-refresh-top" style="font-size:12px;color:var(--muted)"></div>
       </div>
     </div>
 
@@ -788,6 +888,9 @@ async function refresh() {
     allAlerts   = await alertsRes.json();
     const stats = await statsRes.json();
 
+    document.getElementById('h-events').textContent   = stats.total_events;
+    document.getElementById('h-alerts').textContent   = stats.total_alerts;
+    document.getElementById('h-machines').textContent = stats.machines;
     document.getElementById('s-critical').textContent = stats.critical;
     document.getElementById('s-high').textContent     = stats.high;
     document.getElementById('s-unacked').textContent  = stats.unacknowledged;
@@ -800,8 +903,10 @@ async function refresh() {
     renderTactics(stats.tactics || []);
     renderTechniques(stats.top_techniques || []);
 
-    document.getElementById('last-refresh').textContent =
-      'Updated ' + new Date().toLocaleTimeString();
+    const t = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('last-refresh').textContent = t;
+    const top = document.getElementById('last-refresh-top');
+    if (top) top.textContent = t;
   } catch(e) {
     document.getElementById('last-refresh').textContent = 'Refresh failed';
   }
